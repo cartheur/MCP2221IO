@@ -1,28 +1,5 @@
-/*
-* MIT License
-*
-* Copyright (c) 2022 Derek Goslin https://github.com/DerekGn
-*
-* Permission is hereby granted, free of charge, to any person obtaining a copy
-* of this software and associated documentation files (the "Software"), to deal
-* in the Software without restriction, including without limitation the rights
-* to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-* copies of the Software, and to permit persons to whom the Software is
-* furnished to do so, subject to the following conditions:
-*
-* The above copyright notice and this permission notice shall be included in all
-* copies or substantial portions of the Software.
-*
-* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-* OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-* SOFTWARE.
-*/
-
 using FluentAssertions;
+using HidSharp;
 using MCP2221IO.Commands;
 using MCP2221IO.Exceptions;
 using MCP2221IO.Gp;
@@ -44,13 +21,58 @@ namespace MCP2221IO.UnitTests
     {
         private readonly Mock<IHidDevice> _mockHidDevice;
         private readonly ITestOutputHelper _output;
+        private ILogger<IHidDevice> _loggerOne;
+        private ILogger<IDevice> _loggerOneDevice;
+        private ILogger<IHidDevice> _loggerTwo;
+        private ILogger<IDevice> _loggerTwoDevice;
         private readonly Device _device;
+
+        int vid = Convert.ToInt32(0x04d8);
+        int pid = Convert.ToInt32(0x00dd);
 
         public DeviceTests(ITestOutputHelper output)
         {
             _mockHidDevice = new Mock<IHidDevice>();
             _device = new Device(Mock.Of<ILogger<IDevice>>(), _mockHidDevice.Object);
             _output = output;
+        }
+
+        [Fact]
+        public void SanityTest()
+        {
+            // Cartheur Stage One = vid_04d8 - &pid_00dd
+            var stageOne = DeviceList.Local.GetHidDeviceOrNull(0x04d8, 0x00dd, null, null);
+            // Cartheur Stage Two = vid_04d9 - &pid_00de
+            var stageTwo = DeviceList.Local.GetHidDeviceOrNull(0x04d9, 0x00de, null, null);
+            //var summy = DeviceList.Local.GetAllDevices();
+            // Mock the ILogger.
+            _loggerOne = Mock.Of<ILogger<IHidDevice>>();
+            _loggerTwo = Mock.Of<ILogger<IHidDevice>>();
+            _loggerOneDevice = Mock.Of<ILogger<IDevice>>();
+            _loggerTwoDevice = Mock.Of<ILogger<IDevice>>();
+
+            if (stageOne != null && stageTwo != null)
+            {
+                using HidSharpHidDevice hidDeviceOne = new HidSharpHidDevice(_loggerOne, stageOne);
+                using Device deviceOne = new Device(_loggerOneDevice, hidDeviceOne);
+
+                deviceOne.Open();
+                deviceOne.Status = new DeviceStatus();
+                var statusOne = deviceOne.Status;
+
+                using HidSharpHidDevice hidDeviceTwo = new HidSharpHidDevice(_loggerTwo, stageTwo);
+                using Device deviceTwo = new Device(_loggerTwoDevice, hidDeviceTwo);
+
+                deviceTwo.Open();
+                var statusTwo = deviceTwo.Status;
+
+                var hold = 0;
+
+            }
+            else
+            {
+                Console.Error.WriteLine($"Unable to find HID device VID");
+            }
         }
 
         [Fact]
